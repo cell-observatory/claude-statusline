@@ -1,0 +1,3 @@
+# Normalize line endings on checkin; shell scripts must stay LF so they execute on any OS.
+* text=auto
+*.sh text eol=lf

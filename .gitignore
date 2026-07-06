@@ -1,0 +1,7 @@
+# Local calibration / usage state — machine-specific, never commit
+statusline-usage.json
+statusline-usage.json.tmp
+*.tmp
+
+# OS cruft
+.DS_Store
