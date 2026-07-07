@@ -1,0 +1,28 @@
+name: Release
+
+# Cut a release by pushing a version tag:  git tag v0.1.0 && git push origin v0.1.0
+# Attaches the two self-contained scripts so hosts without a clone can grab a pinned version.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checks
+        run: |
+          bash -n statusline.sh install-statusline.sh remote-install.sh
+          diff <(awk "/STATUSLINE_EOF'\$/{f=1;next}/^STATUSLINE_EOF\$/{f=0}f" install-statusline.sh) statusline.sh
+      - name: Create GitHub Release with the scripts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            statusline.sh install-statusline.sh \
+            --title "claude-statusline ${GITHUB_REF_NAME}" \
+            --generate-notes

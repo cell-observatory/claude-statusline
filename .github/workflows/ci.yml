@@ -1,0 +1,53 @@
+name: CI
+
+# Runs on the remote worker without any Claude account: syntax + lint checks, the installer's
+# embedded-copy consistency check, and a behavioral smoke that feeds statusline.sh a sample Claude
+# Code payload and asserts the rendered lines + the statusline-last.json persist (incl. self-heal).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bash syntax
+        run: bash -n statusline.sh install-statusline.sh remote-install.sh
+
+      - name: Installer embeds the current statusline.sh
+        run: diff <(awk "/STATUSLINE_EOF'\$/{f=1;next}/^STATUSLINE_EOF\$/{f=0}f" install-statusline.sh) statusline.sh
+
+      - name: Shellcheck (errors only — style is intentional)
+        if: runner.os == 'Linux'
+        run: shellcheck -S error statusline.sh install-statusline.sh remote-install.sh
+
+      - name: Behavioral smoke (render + persist + self-heal)
+        run: |
+          set -eu
+          export CLAUDE_CONFIG_DIR="$(mktemp -d)"
+          mkdir -p "$CLAUDE_CONFIG_DIR/projects"
+          NOW=$(date +%s)
+          SAMPLE=$(printf '{"workspace":{"current_dir":"%s"},"model":{"display_name":"Opus 4.8"},"context_window":{"used_percentage":39.0,"total_input_tokens":380000,"total_output_tokens":10000,"context_window_size":1000000},"rate_limits":{"five_hour":{"used_percentage":12.5,"resets_at":%s},"seven_day":{"used_percentage":27.3,"resets_at":%s}}}' "$PWD" $((NOW+7200)) $((NOW+259200)))
+          OUT=$(printf '%s' "$SAMPLE" | bash statusline.sh)
+          echo "$OUT"
+          echo "$OUT" | head -1 | grep -q "Opus 4.8"                      # line 1: dir | model
+          echo "$OUT" | sed -n 2p | grep -q "ctx"                          # line 2: usage bars
+          echo "$OUT" | sed -n 2p | grep -q "39%"
+          jq -e '.five_pct == 12.5 and .week_pct == 27.3' "$CLAUDE_CONFIG_DIR/statusline-last.json"
+          # a turn WITHOUT rate_limits keeps the last known-good values (merge semantics)
+          printf '%s' '{"workspace":{"current_dir":"/x"},"model":{"display_name":"Opus 4.8"},"context_window":{"used_percentage":41,"total_input_tokens":1,"total_output_tokens":1,"context_window_size":1000000}}' | bash statusline.sh >/dev/null
+          jq -e '.five_pct == 12.5 and .ctx_pct == 41' "$CLAUDE_CONFIG_DIR/statusline-last.json"
+          # a CORRUPT cache file must self-heal on the next turn (regression: it used to wedge forever)
+          echo '{corrupt' > "$CLAUDE_CONFIG_DIR/statusline-last.json"
+          printf '%s' "$SAMPLE" | bash statusline.sh >/dev/null
+          jq -e '.five_pct == 12.5' "$CLAUDE_CONFIG_DIR/statusline-last.json"
+          echo "smoke OK"

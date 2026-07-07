@@ -148,6 +148,29 @@ PYEOF
 )"
 fi
 
+# Persist the exact values so the Claude Observatory VS Code sidebar ("Usage" panel) shows the same
+# numbers as this line — including the 5h/week token estimates (est5/est7, computed just above). Merge
+# with the previous file so a turn missing rate_limits keeps the last known-good. Never fail the line.
+_LAST="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/statusline-last.json"
+_old=$(cat "$_LAST" 2>/dev/null || echo '{}')
+# If the existing file is corrupt/truncated/empty, --argjson would abort the jq below on EVERY
+# turn and the persist would silently stop updating forever — fall back to '{}' so it self-heals.
+printf '%s' "$_old" | jq -e . >/dev/null 2>&1 || _old='{}'
+printf '%s' "$input" | jq -c --argjson old "$_old" --arg est5 "${est5:-}" --arg est7 "${est7:-}" '{
+  ts: now,
+  model: (.model.display_name // $old.model // ""),
+  dir: (.workspace.current_dir // .cwd // $old.dir // ""),
+  ctx_pct: (.context_window.used_percentage // $old.ctx_pct),
+  ctx_used: ((.context_window.total_input_tokens // 0) + (.context_window.total_output_tokens // 0)),
+  ctx_size: (.context_window.context_window_size // $old.ctx_size),
+  five_pct: (.rate_limits.five_hour.used_percentage // $old.five_pct),
+  five_reset: (.rate_limits.five_hour.resets_at // $old.five_reset),
+  week_pct: (.rate_limits.seven_day.used_percentage // $old.week_pct),
+  week_reset: (.rate_limits.seven_day.resets_at // $old.week_reset),
+  five_tok: (($est5 | tonumber?) // $old.five_tok),
+  week_tok: (($est7 | tonumber?) // $old.week_tok)
+}' > "$_LAST.tmp" 2>/dev/null && mv "$_LAST.tmp" "$_LAST" 2>/dev/null || true
+
 # Line 2
 parts=()
 # Each segment shows a dim "label —" placeholder until its value arrives, so a fresh

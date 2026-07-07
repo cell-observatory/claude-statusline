@@ -95,7 +95,10 @@ back-of-envelope estimate, computed locally:
 
 ## Files
 
-- `statusline.sh` — the status line itself. This is the source of truth.
+- `statusline.sh` — the status line itself. This is the source of truth. Each turn it also writes the
+  exact values it renders to `~/.claude/statusline-last.json` (ctx / 5h / week percentages, token
+  used/size, and reset times), so other tools — e.g. the Claude Observatory VS Code sidebar — can show
+  the same numbers outside a live turn. Safe to delete; it's rewritten on the next turn.
 - `install-statusline.sh` — self-contained installer. It **embeds a verbatim copy** of
   `statusline.sh` so the one-liner above works with a single file.
 - `remote-install.sh` — install on one or more remote hosts over SSH (streams the installer to
