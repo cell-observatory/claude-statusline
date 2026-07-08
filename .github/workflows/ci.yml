@@ -51,3 +51,23 @@ jobs:
           printf '%s' "$SAMPLE" | bash statusline.sh >/dev/null
           jq -e '.five_pct == 12.5' "$CLAUDE_CONFIG_DIR/statusline-last.json"
           echo "smoke OK"
+
+      - name: Behavioral smoke (ISO-8601 resets — the devcontainer format)
+        run: |
+          set -eu
+          export CLAUDE_CONFIG_DIR="$(mktemp -d)"
+          mkdir -p "$CLAUDE_CONFIG_DIR/projects"
+          ERR="$CLAUDE_CONFIG_DIR/stderr.txt"
+          # Some Claude Code builds — notably inside Linux containers — send resets_at as an ISO-8601
+          # string instead of an epoch int. This used to blow up until_str's integer math (silent
+          # stderr noise + a broken countdown). Far-future dates so the countdown is always "Xd Yh".
+          SAMPLE='{"workspace":{"current_dir":"/x"},"model":{"display_name":"Opus 4.8"},"context_window":{"used_percentage":39.0,"total_input_tokens":380000,"total_output_tokens":10000,"context_window_size":1000000},"rate_limits":{"five_hour":{"used_percentage":12.5,"resets_at":"2035-01-01T00:00:00Z"},"seven_day":{"used_percentage":27.3,"resets_at":"2035-01-08T00:00:00Z"}}}'
+          OUT=$(printf '%s' "$SAMPLE" | bash statusline.sh 2>"$ERR")
+          echo "$OUT"
+          # (1) no arithmetic/parse error reached stderr
+          if [ -s "$ERR" ]; then echo "FAIL: unexpected stderr:"; cat "$ERR"; exit 1; fi
+          # (2) the reset countdown rendered (line 2 carries an "Xd Yh" for a far-future reset)
+          echo "$OUT" | sed -n 2p | grep -qE '[0-9]+d [0-9]+h'
+          # (3) the ISO value still round-trips into the persisted cache
+          jq -e '.five_pct == 12.5 and .week_pct == 27.3' "$CLAUDE_CONFIG_DIR/statusline-last.json"
+          echo "ISO smoke OK"

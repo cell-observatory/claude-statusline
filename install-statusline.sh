@@ -73,8 +73,26 @@ BAR_EMPTY="████████████████████"
 bar() { local p=${1%.*}; [ -z "$p" ] && p=0; local w=${2:-8} col="$3" f
   f=$(( (p * w + 50) / 100 )); [ "$f" -gt "$w" ] && f=$w; [ "$f" -lt 0 ] && f=0
   printf '%s%s%s%s%s' "$col" "${BAR_FULL:0:$f}" "$DIM" "${BAR_EMPTY:0:$((w-f))}" "$col"; }
-# seconds-until-epoch -> "Xd Yh" / "Xh Ym" / "Xm" / "now"
-until_str() { local e="$1" now d; now=$(date +%s); d=$(( e - now ))
+# Normalize a resets_at value to integer epoch SECONDS. Claude Code sends it as either an epoch
+# (seconds, or ms when >=13 digits) OR an ISO-8601 string like "2026-07-08T12:00:00Z" (seen inside
+# Linux containers) — the raw ISO form would blow up until_str's integer math. Prints the epoch on
+# success, nothing on failure so callers guard on empty. ISO parsers tried in order: GNU `date -d`
+# (Linux, where ISO actually shows up), python3 fromisoformat, then BSD/macOS `date -j`.
+to_epoch() { local v="$1" e=
+  case "$v" in
+    ''|*[!0-9.]*) ;;                                  # empty or non-numeric (ISO) -> parse below
+    *) e=${v%.*}; [ "${#e}" -ge 13 ] && e=$(( e / 1000 )); printf '%s' "$e"; return 0 ;;
+  esac
+  [ -z "$v" ] && return 0
+  e=$(date -d "$v" +%s 2>/dev/null) && { printf '%s' "$e"; return 0; }
+  if command -v python3 >/dev/null 2>&1; then
+    e=$(python3 -c 'import sys,datetime as d; s=sys.argv[1].strip(); s=s[:-1]+"+00:00" if s.endswith("Z") else s; print(int(d.datetime.fromisoformat(s).timestamp()))' "$v" 2>/dev/null) \
+      && { printf '%s' "$e"; return 0; }
+  fi
+  e=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%S" "${v%%[.Z+]*}" +%s 2>/dev/null) && printf '%s' "$e"; }
+# resets_at (epoch or ISO-8601) -> "Xd Yh" / "Xh Ym" / "Xm" / "now"; empty if unparseable
+until_str() { local e; e=$(to_epoch "$1"); [ -z "$e" ] && return 0
+  local now d; now=$(date +%s); d=$(( e - now ))
   if [ "$d" -le 0 ]; then echo now
   elif [ "$d" -ge 86400 ]; then echo "$((d/86400))d $(((d%86400)/3600))h"
   elif [ "$d" -ge 3600 ]; then echo "$((d/3600))h $(((d%3600)/60))m"

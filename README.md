@@ -64,6 +64,32 @@ bars fill in after the first reply and only appear on Claude.ai subscription pla
 The installer is idempotent — re-run it any time to refresh. It honors `$CLAUDE_CONFIG_DIR`
 if you keep your Claude config somewhere other than `~/.claude` (handy on a remote/SSH box).
 
+**Inside a devcontainer.** The status line runs wherever `claude` runs — i.e. **inside the
+container** — so install it there, not on your laptop. Bake it into your `postCreateCommand` so a
+rebuilt container comes back configured:
+
+```jsonc
+// .devcontainer/devcontainer.json
+{
+  "postCreateCommand": "curl -fsSL https://raw.githubusercontent.com/cell-observatory/claude-statusline/main/install-statusline.sh | bash",
+  "remoteEnv": {
+    // Optional: keep the config (and its statusline-last.json) on a mounted volume so it
+    // survives rebuilds. Set the SAME value everywhere that reads it (see note below).
+    "CLAUDE_CONFIG_DIR": "/workspace/.claude"
+  }
+}
+```
+
+Two things the container image must provide: **`jq`** (required) and a **UTF-8 locale** for the bar
+glyphs (the script auto-selects one if the image ships `C.UTF-8`/`en_US.UTF-8`; otherwise add it,
+e.g. `apt-get install -y locales jq`). `python3` is optional (only powers the `~` token estimate).
+
+If you relocate `CLAUDE_CONFIG_DIR`, point **every** tool that reads it at the same path — Claude
+Code, this status line, and the [Claude Observatory](https://github.com/cell-observatory/claude-observatory)
+sidebar all key off it. The Observatory repo ships a ready-to-copy
+[`docs/devcontainer/`](https://github.com/cell-observatory/claude-observatory/tree/main/docs/devcontainer)
+template that wires up both tools (and the correct `TZ`) in one shot.
+
 ## Requirements
 
 - **`jq`** (required — the script parses Claude Code's JSON input with it)
