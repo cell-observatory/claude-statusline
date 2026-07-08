@@ -22,6 +22,10 @@ ctx [███─────] 32% · 320k/1M | 5h [█████───] 63
     transcripts and multiplies by the account-wide `%`. It starts near this machine's usage and
     climbs toward your true account total as your other machines move the `%`. See below.
 
+> **Using [Claude Observatory](https://github.com/cell-observatory/claude-observatory)?** This
+> status line ships **bundled** with its CLI — `claude-observatory statusline` installs it with no
+> download. This repo remains the standalone home for statusline-only setups.
+
 ## Install
 
 **One-liner** — installs into `~/.claude` and merges a `statusLine` entry into your
