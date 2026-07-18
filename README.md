@@ -8,19 +8,22 @@ context-window fill and your Claude.ai plan usage (with reset countdowns) at a g
 <sub>Plain-text rendering — bar color tracks usage: green &lt;50%, yellow 50–79%, red ≥80%.</sub>
 
 ```
-my-project | main | Opus 4.8
-ctx [███─────] 32% · 320k/1M | 5h [█████───] 63% ·2h10m ~4.8M | wk [███████─] 88% ·4d6h ~14M
+14:32 · Jul 17 | my-project | main | Opus 4.8 · high · think · 1h32m
+ctx [███─────] 32% · 320k/1M | 5h [█████───] 63% ·2h10m ~4.8M/15M | wk [███████─] 88% ·4d6h ~14M/16M
 ```
 
-- **Line 1** — current dir · git branch · model
+- **Line 1** — a leading clock (current **time · date**), then current dir · git branch · model,
+  followed by the model's reasoning **effort** (`low`…`max`), a `think` marker when extended thinking
+  is on, the **output style** (when not the default), and the session **duration** — each shown only
+  when Claude Code reports it.
 - **Line 2** — `ctx` context-window used % **and absolute tokens used / window size**; `5h`
   rolling-5-hour plan usage %; `wk` 7-day plan usage %. Each bar is green < 50%,
   yellow 50–79%, red ≥ 80%, and shows time until reset.
-  - The `5h`/`wk` bars also carry a `~` **token estimate** (e.g. `~2.1M`). Claude Code exposes
-    only a *percentage* for those windows — never a token count — so this is a rough,
-    self-calibrating figure: the script learns your tokens-per-percent from your own
-    transcripts and multiplies by the account-wide `%`. It starts near this machine's usage and
-    climbs toward your true account total as your other machines move the `%`. See below.
+  - The `5h`/`wk` bars also carry a `~` **used / total token estimate** (e.g. `~4.8M/15M`). Claude Code
+    exposes only a *percentage* for those windows — never a token count — so this is a rough,
+    self-calibrating figure: the script learns your tokens-per-percent from your own transcripts, then
+    shows the window's used tokens over the projected 100% budget. It starts near this machine's usage
+    and climbs toward your true account total as your other machines move the `%`. See below.
 
 > **Using [Claude Observatory](https://github.com/cell-observatory/claude-observatory)?** This
 > status line ships **bundled** with its CLI — `claude-observatory statusline` installs it with no

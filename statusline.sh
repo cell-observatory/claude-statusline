@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 Cell Observatory
 # Claude Code status line.
-#   Line 1: dir | branch | model
-#   Line 2: context% | 5h usage% (resets) | week usage% (resets)
+#   Line 1: time · date | dir | branch | model · effort · think · style · dur
+#           (effort/think/style/dur shown only when present)
+#   Line 2: context% (used/size) | 5h usage% (resets · ~used/total) | week usage% (resets · ~used/total)
 # rate_limits.* fields are sent only for Claude.ai subscription plans (Pro/Max/Team)
 # and only after the first API response in a session, so line 2's usage may be empty
 # in a fresh session. Schema: https://code.claude.com/docs/en/statusline.md
@@ -22,6 +23,10 @@ j() { printf '%s' "$input" | jq -r "$1"; }
 
 dir=$(j '.workspace.current_dir // .cwd // ""')
 model=$(j '.model.display_name // ""')
+effort=$(j '.effort.level // ""')            # reasoning effort (low/medium/high/xhigh/max); absent if unsupported
+thinking=$(j '.thinking.enabled // false')   # extended thinking on/off
+ostyle=$(j '.output_style.name // ""')       # active output style (hidden when default)
+dur_ms=$(j '.cost.total_duration_ms // empty') # wall-clock session duration
 ctx=$(j '.context_window.used_percentage // empty')
 ctx_in=$(j '.context_window.total_input_tokens // 0')
 ctx_out=$(j '.context_window.total_output_tokens // 0')
@@ -76,11 +81,21 @@ human() { local n=${1%.*}; [ -z "$n" ] && n=0
     if [ "$d" -eq 0 ]; then printf '%dM' $((n/1000000)); else printf '%d.%dM' $((n/1000000)) "$d"; fi
   elif [ "$n" -ge 1000 ]; then printf '%dk' $((n/1000))
   else printf '%d' "$n"; fi; }
+# milliseconds -> compact wall time "1h04m" / "4m" / "30s"
+dur_str() { local s=$(( ${1%.*} / 1000 ))
+  if [ "$s" -ge 3600 ]; then printf '%dh%02dm' $((s/3600)) $(((s%3600)/60))
+  elif [ "$s" -ge 60 ]; then printf '%dm' $((s/60))
+  else printf '%ds' "$s"; fi; }
 
-# Line 1
-line1="$(basename "$dir")"
+# Line 1 — leading clock (time · date), then dir | branch | model + model/session attributes.
+line1="$(date +%H:%M) ${DIM}·${R} $(date '+%b %d')"
+line1="$line1 $DIM|$R $(basename "$dir")"
 [ -n "$branch" ] && line1="$line1 $DIM|$R $branch"
 [ -n "$model" ]  && line1="$line1 $DIM|$R $model"
+[ -n "$effort" ] && line1="$line1 ${DIM}·${R} $effort"
+[ "$thinking" = "true" ] && line1="$line1 ${DIM}·${R} think"
+case "$ostyle" in ''|null|default|Default) ;; *) line1="$line1 ${DIM}·${R} $ostyle" ;; esac
+{ [ -n "$dur_ms" ] && [ "${dur_ms%.*}" -ge 1000 ]; } && line1="$line1 ${DIM}·${R} $(dur_str "$dur_ms")"
 printf '%b\n' "$line1"
 
 # --- account-wide token ESTIMATE for the 5h/wk windows (rough, self-calibrating) ---
@@ -96,7 +111,7 @@ printf '%b\n' "$line1"
 est5=""; est7=""
 if command -v python3 >/dev/null 2>&1 && { [ -n "$five_pct" ] || [ -n "$week_pct" ]; }; then
   CFG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-  read -r est5 est7 <<<"$(python3 - "$CFG_DIR/statusline-usage.json" "$CFG_DIR/projects" \
+  read -r est5 tot5 est7 tot7 <<<"$(python3 - "$CFG_DIR/statusline-usage.json" "$CFG_DIR/projects" \
       "${five_pct:-0}" "${five_reset:-0}" "${week_pct:-0}" "${week_reset:-0}" 2>/dev/null <<'PYEOF'
 import sys, os, json, glob, time, datetime, signal
 sp, proj = sys.argv[1], sys.argv[2]
@@ -161,7 +176,9 @@ if ((now - last) >= THR or not st) and (r5 or r7):
     except Exception: pass
 e5 = int(p5 * tpp5) if (p5 and tpp5) else 0
 e7 = int(p7 * tpp7) if (p7 and tpp7) else 0
-print(f"{e5} {e7}")
+t5 = int(tpp5 * 100) if tpp5 else 0   # projected 100% budget (tokens) for the 5h window
+t7 = int(tpp7 * 100) if tpp7 else 0   # projected 100% budget (tokens) for the week window
+print(f"{e5} {t5} {e7} {t7}")
 PYEOF
 )"
 fi
@@ -200,11 +217,12 @@ if [ -n "$ctx" ]; then c=$(uc "$ctx"); ct=""
   parts+=("${c}ctx [$(bar "$ctx" 8 "$c")] ${ctx%.*}%${R}${ct}")
 else parts+=("${DIM}ctx —${R}"); fi
 if [ -n "$five_pct" ]; then c=$(uc "$five_pct"); s=""; [ -n "$five_reset" ] && s=" ${DIM}·$(until_str "$five_reset")${R}"
-  [ "${est5:-0}" != 0 ] && s="$s ${DIM}~$(human "$est5")${R}"
+  # ~used/projected-total (total = 100% of the window's estimated budget); used-only until it calibrates
+  if [ "${est5:-0}" != 0 ]; then if [ "${tot5:-0}" != 0 ]; then s="$s ${DIM}~$(human "$est5")/$(human "$tot5")${R}"; else s="$s ${DIM}~$(human "$est5")${R}"; fi; fi
   parts+=("${c}5h [$(bar "$five_pct" 8 "$c")] $(printf '%.0f' "$five_pct")%${R}${s}")
 else parts+=("${DIM}5h —${R}"); fi
 if [ -n "$week_pct" ]; then c=$(uc "$week_pct"); s=""; [ -n "$week_reset" ] && s=" ${DIM}·$(until_str "$week_reset")${R}"
-  [ "${est7:-0}" != 0 ] && s="$s ${DIM}~$(human "$est7")${R}"
+  if [ "${est7:-0}" != 0 ]; then if [ "${tot7:-0}" != 0 ]; then s="$s ${DIM}~$(human "$est7")/$(human "$tot7")${R}"; else s="$s ${DIM}~$(human "$est7")${R}"; fi; fi
   parts+=("${c}wk [$(bar "$week_pct" 8 "$c")] $(printf '%.0f' "$week_pct")%${R}${s}")
 else parts+=("${DIM}wk —${R}"); fi
 out=""

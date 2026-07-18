@@ -1,11 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="820" height="120" viewBox="0 0 820 120" role="img" aria-label="Claude Code status line preview: context 32%, 5h 63%, week 88%">
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="120" viewBox="0 0 920 120" role="img" aria-label="Claude Code status line preview: Opus 4.8, effort high, context 32%, 5h 63%, week 88%">
   <title>claude-statusline preview</title>
-  <rect x="1" y="1" width="818" height="118" rx="9" fill="#0d1117" stroke="#30363d"/>
+  <rect x="1" y="1" width="918" height="118" rx="9" fill="#0d1117" stroke="#30363d"/>
   <circle cx="24" cy="24" r="6" fill="#ff5f56"/>
   <circle cx="44" cy="24" r="6" fill="#febc2e"/>
   <circle cx="64" cy="24" r="6" fill="#28c840"/>
   <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">
-    <text x="20" y="70" xml:space="preserve" fill="#c9d1d9">my-project <tspan fill="#6e7681">|</tspan> main <tspan fill="#6e7681">|</tspan> Opus 4.8</text>
-    <text x="20" y="98" xml:space="preserve"><tspan fill="#3fb950">ctx [███</tspan><tspan fill="#6e7681">─────</tspan><tspan fill="#3fb950">] 32%</tspan><tspan fill="#6e7681"> · 320k/1M </tspan><tspan fill="#6e7681">| </tspan><tspan fill="#d29922">5h [█████</tspan><tspan fill="#6e7681">───</tspan><tspan fill="#d29922">] 63%</tspan><tspan fill="#6e7681"> ·2h10m ~4.8M </tspan><tspan fill="#6e7681">| </tspan><tspan fill="#f85149">wk [███████</tspan><tspan fill="#6e7681">─</tspan><tspan fill="#f85149">] 88%</tspan><tspan fill="#6e7681"> ·4d6h ~14M</tspan></text>
+    <text x="20" y="70" xml:space="preserve" fill="#c9d1d9">14:32 <tspan fill="#6e7681">·</tspan> Jul 17 <tspan fill="#6e7681">|</tspan> my-project <tspan fill="#6e7681">|</tspan> main <tspan fill="#6e7681">|</tspan> Opus 4.8 <tspan fill="#6e7681">·</tspan> high <tspan fill="#6e7681">·</tspan> think <tspan fill="#6e7681">·</tspan> 1h32m</text>
+    <text x="20" y="98" xml:space="preserve"><tspan fill="#3fb950">ctx [███</tspan><tspan fill="#6e7681">─────</tspan><tspan fill="#3fb950">] 32%</tspan><tspan fill="#6e7681"> · 320k/1M </tspan><tspan fill="#6e7681">| </tspan><tspan fill="#d29922">5h [█████</tspan><tspan fill="#6e7681">───</tspan><tspan fill="#d29922">] 63%</tspan><tspan fill="#6e7681"> ·2h10m ~4.8M/15M </tspan><tspan fill="#6e7681">| </tspan><tspan fill="#f85149">wk [███████</tspan><tspan fill="#6e7681">─</tspan><tspan fill="#f85149">] 88%</tspan><tspan fill="#6e7681"> ·4d6h ~14M/16M</tspan></text>
   </g>
 </svg>
