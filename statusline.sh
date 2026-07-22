@@ -4,8 +4,8 @@
 # Claude Code status line.
 #   Line 1: time · date | branch (only inside a git repo) | current path (~-abbreviated)
 #   Line 2: session title (falls back to the folder name) | model · effort · think · style ·
-#           ◷duration · ↑input ↓output ↺cached session tokens
-#           (effort/think/style/duration/tokens shown only when present)
+#           ↑input ↓output ↺cached session tokens · ◷duration
+#           (effort/think/style/tokens/duration shown only when present)
 #   Line 3: context% (used/size) | 5h usage% (resets · ~used/total) | week usage% (resets · ~used/total)
 # rate_limits.* fields are sent only for Claude.ai subscription plans (Pro/Max/Team)
 # and only after the first API response in a session, so line 2's usage may be empty
@@ -128,8 +128,8 @@ line2="$title"
 [ -n "$effort" ] && line2="$line2 ${DIM}·${R} $effort"
 [ "$thinking" = "true" ] && line2="$line2 ${DIM}·${R} think"
 case "$ostyle" in ''|null|default|Default) ;; *) line2="$line2 ${DIM}·${R} $ostyle" ;; esac
-{ [ -n "$dur_ms" ] && [ "${dur_ms%.*}" -ge 1000 ]; } && line2="$line2 ${DIM}·${R} ${DIM}◷${R}$(dur_str "$dur_ms")"
 [ -n "$t_in" ] && line2="$line2 ${DIM}·${R} ${DIM}↑${R}$(human "$t_in") ${DIM}↓${R}$(human "$t_out") ${DIM}↺${R}$(human "$t_cr")"
+{ [ -n "$dur_ms" ] && [ "${dur_ms%.*}" -ge 1000 ]; } && line2="$line2 ${DIM}·${R} ${DIM}◷${R}$(dur_str "$dur_ms")"
 printf '%b\n' "$line2"
 
 # --- account-wide token ESTIMATE for the 5h/wk windows (rough, self-calibrating) ---
