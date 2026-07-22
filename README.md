@@ -1,22 +1,30 @@
 # claude-statusline
 ![claude-statusline](docs/statusline.svg)
 
-A two-line status line for the [Claude Code](https://code.claude.com) CLI that shows your
-context-window fill and your Claude.ai plan usage (with reset countdowns) at a glance:
+A three-line status line for the [Claude Code](https://code.claude.com) CLI that shows where you
+are, what the session is doing (title + token spend), and your context-window fill and Claude.ai
+plan usage (with reset countdowns) at a glance:
 
 
 <sub>Plain-text rendering — bar color tracks usage: green &lt;50%, yellow 50–79%, red ≥80%.</sub>
 
 ```
-14:32 · Jul 17 | my-project | main | Opus 4.8 · high · think · 1h32m
+14:32 · Jul 17 | main | ~/code/my-project
+Add request validation to the API | Opus 4.8 · high · think · ◷1h32m · ↑12k ↓96k ↺8.4M
 ctx [███─────] 32% · 320k/1M | 5h [█████───] 63% ·2h10m ~4.8M/15M | wk [███████─] 88% ·4d6h ~14M/16M
 ```
 
-- **Line 1** — a leading clock (current **time · date**), then current dir · git branch · model,
-  followed by the model's reasoning **effort** (`low`…`max`), a `think` marker when extended thinking
-  is on, the **output style** (when not the default), and the session **duration** — each shown only
-  when Claude Code reports it.
-- **Line 2** — `ctx` context-window used % **and absolute tokens used / window size**; `5h`
+- **Line 1** — when and where: the clock (**time · date**), the git **branch** (only inside a
+  repo), and the **current path** (`~`-abbreviated).
+- **Line 2** — the session: its **title** (Claude Code's own name for the session; the folder name
+  until one exists) · model, followed by the model's reasoning **effort** (`low`…`max`), a `think`
+  marker when extended thinking is on, the **output style** (when not the default), the session
+  **duration** (`◷`), and the session's **token counters** — `↑` input (uncached) · `↓` output ·
+  `↺` cached (cache reads), the same split the
+  [Claude Observatory](https://github.com/cell-observatory/claude-observatory) Stats panel shows,
+  via its bundled CLI (the counters are simply omitted when it isn't installed) — each shown only
+  when available.
+- **Line 3** — `ctx` context-window used % **and absolute tokens used / window size**; `5h`
   rolling-5-hour plan usage %; `wk` 7-day plan usage %. Each bar is green < 50%,
   yellow 50–79%, red ≥ 80%, and shows time until reset.
   - The `5h`/`wk` bars also carry a `~` **used / total token estimate** (e.g. `~4.8M/15M`). Claude Code
