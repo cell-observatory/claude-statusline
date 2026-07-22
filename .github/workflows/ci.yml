@@ -39,9 +39,12 @@ jobs:
           SAMPLE=$(printf '{"workspace":{"current_dir":"%s"},"model":{"display_name":"Opus 4.8"},"context_window":{"used_percentage":39.0,"total_input_tokens":380000,"total_output_tokens":10000,"context_window_size":1000000},"rate_limits":{"five_hour":{"used_percentage":12.5,"resets_at":%s},"seven_day":{"used_percentage":27.3,"resets_at":%s}}}' "$PWD" $((NOW+7200)) $((NOW+259200)))
           OUT=$(printf '%s' "$SAMPLE" | bash statusline.sh)
           echo "$OUT"
-          echo "$OUT" | head -1 | grep -q "Opus 4.8"                      # line 1: dir | model
-          echo "$OUT" | sed -n 2p | grep -q "ctx"                          # line 2: usage bars
-          echo "$OUT" | sed -n 2p | grep -q "39%"
+          [ "$(echo "$OUT" | wc -l)" -eq 3 ]                               # three rows: where/when · session · bars
+          echo "$OUT" | head -1 | grep -qE '^[0-9]{2}:[0-9]{2} '           # line 1 leads with the clock
+          echo "$OUT" | sed -n 2p | grep -q "claude-statusline"            # line 2: session title (folder fallback)…
+          echo "$OUT" | sed -n 2p | grep -q "Opus 4.8"                     # …then the model
+          echo "$OUT" | sed -n 3p | grep -q "ctx"                          # line 3: usage bars
+          echo "$OUT" | sed -n 3p | grep -q "39%"
           jq -e '.five_pct == 12.5 and .week_pct == 27.3' "$CLAUDE_CONFIG_DIR/statusline-last.json"
           # a turn WITHOUT rate_limits keeps the last known-good values (merge semantics)
           printf '%s' '{"workspace":{"current_dir":"/x"},"model":{"display_name":"Opus 4.8"},"context_window":{"used_percentage":41,"total_input_tokens":1,"total_output_tokens":1,"context_window_size":1000000}}' | bash statusline.sh >/dev/null
@@ -66,8 +69,8 @@ jobs:
           echo "$OUT"
           # (1) no arithmetic/parse error reached stderr
           if [ -s "$ERR" ]; then echo "FAIL: unexpected stderr:"; cat "$ERR"; exit 1; fi
-          # (2) the reset countdown rendered (line 2 carries an "Xd Yh" for a far-future reset)
-          echo "$OUT" | sed -n 2p | grep -qE '[0-9]+d [0-9]+h'
+          # (2) the reset countdown rendered (line 3 carries an "Xd Yh" for a far-future reset)
+          echo "$OUT" | sed -n 3p | grep -qE '[0-9]+d [0-9]+h'
           # (3) the ISO value still round-trips into the persisted cache
           jq -e '.five_pct == 12.5 and .week_pct == 27.3' "$CLAUDE_CONFIG_DIR/statusline-last.json"
           echo "ISO smoke OK"
