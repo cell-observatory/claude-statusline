@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 Cell Observatory
 # Claude Code status line.
-#   Line 1: time · date | dir | branch | model · effort · think · style · dur
-#           (effort/think/style/dur shown only when present)
-#   Line 2: context% (used/size) | 5h usage% (resets · ~used/total) | week usage% (resets · ~used/total)
+#   Line 1: time · date | branch (only inside a git repo) | current path (~-abbreviated)
+#   Line 2: session title (falls back to the folder name) | model · effort · think · style ·
+#           ↑input ↓output ↺cached session tokens · ◷duration
+#           (effort/think/style/tokens/duration shown only when present)
+#   Line 3: context% (used/size) | 5h usage% (resets · ~used/total) | week usage% (resets · ~used/total)
 # rate_limits.* fields are sent only for Claude.ai subscription plans (Pro/Max/Team)
 # and only after the first API response in a session, so line 2's usage may be empty
 # in a fresh session. Schema: https://code.claude.com/docs/en/statusline.md
@@ -31,6 +33,8 @@ ctx=$(j '.context_window.used_percentage // empty')
 ctx_in=$(j '.context_window.total_input_tokens // 0')
 ctx_out=$(j '.context_window.total_output_tokens // 0')
 ctx_size=$(j '.context_window.context_window_size // empty')
+sid=$(j '.session_id // ""')
+tp=$(j '.transcript_path // ""')
 branch=$(git -C "$dir" --no-optional-locks rev-parse --abbrev-ref HEAD 2>/dev/null)
 
 five_pct=$(j '.rate_limits.five_hour.used_percentage // empty')
@@ -87,16 +91,46 @@ dur_str() { local s=$(( ${1%.*} / 1000 ))
   elif [ "$s" -ge 60 ]; then printf '%dm' $((s/60))
   else printf '%ds' "$s"; fi; }
 
-# Line 1 — leading clock (time · date), then dir | branch | model + model/session attributes.
+# Line 1 — when and where: the clock, the branch (only inside a git repo), and the ~-abbreviated
+# working directory.
+pdir="$dir"; case "$dir" in "$HOME"*) pdir="~${dir#"$HOME"}";; esac
 line1="$(date +%H:%M) ${DIM}·${R} $(date '+%b %d')"
-line1="$line1 $DIM|$R $(basename "$dir")"
 [ -n "$branch" ] && line1="$line1 $DIM|$R $branch"
-[ -n "$model" ]  && line1="$line1 $DIM|$R $model"
-[ -n "$effort" ] && line1="$line1 ${DIM}·${R} $effort"
-[ "$thinking" = "true" ] && line1="$line1 ${DIM}·${R} think"
-case "$ostyle" in ''|null|default|Default) ;; *) line1="$line1 ${DIM}·${R} $ostyle" ;; esac
-{ [ -n "$dur_ms" ] && [ "${dur_ms%.*}" -ge 1000 ]; } && line1="$line1 ${DIM}·${R} $(dur_str "$dur_ms")"
+line1="$line1 $DIM|$R $pdir"
 printf '%b\n' "$line1"
+
+# Session title for line 2: the transcript's latest ai-title — short but informative. The full path
+# already sits on line 1, so the folder name only fills in until Claude titles the session. Cheap:
+# grep pre-filters (no full JSON parse); each candidate line is validated by jq, last valid wins.
+title=""
+if [ -n "$tp" ] && [ -f "$tp" ]; then
+  while IFS= read -r ln; do
+    t=$(printf '%s' "$ln" | jq -r 'select(.type=="ai-title") | .aiTitle // empty' 2>/dev/null)
+    [ -n "$t" ] && title="$t"
+  done < <(grep '"type":"ai-title"' "$tp" 2>/dev/null | tail -n 5)
+fi
+[ -z "$title" ] && title=$(basename "$dir")
+[ "${#title}" -gt 48 ] && title="${title:0:47}…"
+
+# Session token counters (input / output / cache reads) via the claude-observatory CLI this script
+# ships with — the same split its Stats panel shows. Omitted (never zeroed) when the CLI is absent
+# or the session has no usage yet, matching the shown-only-when-present rule of the other segments.
+t_in=""; t_out=""; t_cr=""
+if [ -n "$sid" ] && command -v claude-observatory >/dev/null 2>&1; then
+  read -r t_in t_out t_cr <<<"$( (cd "$dir" 2>/dev/null && claude-observatory usage --session "$sid" 2>/dev/null) \
+    | jq -r '.sessionTokens | select(.total > 0) | "\(.input) \(.output) \(.cacheRead)"' 2>/dev/null)"
+fi
+
+# Line 2 — the session: title, then model + attributes + spend. The ↑/↓/↺/◷ glyphs are plain
+# text (not emoji), dimmed so the numbers carry the line.
+line2="$title"
+[ -n "$model" ]  && line2="$line2 $DIM|$R $model"
+[ -n "$effort" ] && line2="$line2 ${DIM}·${R} $effort"
+[ "$thinking" = "true" ] && line2="$line2 ${DIM}·${R} think"
+case "$ostyle" in ''|null|default|Default) ;; *) line2="$line2 ${DIM}·${R} $ostyle" ;; esac
+[ -n "$t_in" ] && line2="$line2 ${DIM}·${R} ${DIM}↑${R}$(human "$t_in") ${DIM}↓${R}$(human "$t_out") ${DIM}↺${R}$(human "$t_cr")"
+{ [ -n "$dur_ms" ] && [ "${dur_ms%.*}" -ge 1000 ]; } && line2="$line2 ${DIM}·${R} ${DIM}◷${R}$(dur_str "$dur_ms")"
+printf '%b\n' "$line2"
 
 # --- account-wide token ESTIMATE for the 5h/wk windows (rough, self-calibrating) ---
 # Those windows expose ONLY a percentage, never tokens. We approximate absolute tokens as
@@ -206,7 +240,7 @@ printf '%s' "$input" | jq -c --argjson old "$_old" --arg est5 "${est5:-}" --arg 
   week_tok: (($est7 | tonumber?) // $old.week_tok)
 }' > "$_LAST.tmp" 2>/dev/null && mv "$_LAST.tmp" "$_LAST" 2>/dev/null || true
 
-# Line 2
+# Line 3 — the usage bars
 parts=()
 # Each segment shows a dim "label —" placeholder until its value arrives, so a fresh
 # session reads as "loading", not "missing" (ctx is null and rate_limits are absent
